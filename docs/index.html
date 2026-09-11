@@ -83,7 +83,14 @@
   ul.checks b { display: block; }
   ul.checks span { color: var(--muted); font-size: 15px; }
   code { background: var(--code); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
-  ol.setup { padding-left: 20px; } ol.setup li { margin-bottom: 8px; }
+  .setup-steps { display: grid; gap: 14px; }
+  .setup-step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .setup-step h3 { margin: 0 0 10px; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .setup-step ol.sub { margin: 0; padding-left: 22px; }
+  .setup-step ol.sub li { margin-bottom: 6px; color: var(--muted); font-size: 15px; }
+  .setup-step ol.sub li b { color: var(--ink); }
+  .setup-step .tip { margin: 8px 0 0; font-size: 13px; color: var(--accent); font-weight: 700; }
+  .kbd { background: var(--code); border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; font-size: 13px; }
   .stack { display: flex; flex-wrap: wrap; gap: 8px; }
   .stack span { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: 14px; }
   footer { padding: 36px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
@@ -210,13 +217,54 @@
 
 <section id="setup">
   <h2>직접 써 보기</h2>
-  <p class="sub">자세한 내용은 저장소의 README에 있습니다.</p>
-  <ol class="setup">
-    <li>저장소를 가져갑니다(Fork 또는 코드 복사). 명단에 슬랙 ID가 들어가니 <b>비공개 저장소</b>를 권합니다.</li>
-    <li>Settings → Secrets에 <code>SLACK_BOT_TOKEN</code>(슬랙 앱, <code>chat:write</code>)과 <code>STEAM_API_KEY</code>를 넣습니다.</li>
-    <li>Settings → Variables에 <code>RADAR_ENABLED</code> = <code>true</code>를 넣으면 매일 수집이 켜집니다.</li>
-    <li><code>subscribers.yaml</code>에 슬랙 멤버 ID와 스팀 프로필 주소를 적습니다. 일주일 뒤 월요일에 첫 DM이 옵니다.</li>
-  </ol>
+  <p class="sub">아래 <b>Settings</b>는 전부 "이 저장소만의 설정" 화면을 말합니다. GitHub 계정 설정이 아니라, 저장소를 연 상태에서 위쪽 탭 중 하나예요. 순서대로만 따라 하면 됩니다.</p>
+  <div class="setup-steps">
+
+    <div class="setup-step">
+      <h3><span class="num">1</span> 내 계정으로 저장소 복사하기 (Fork)</h3>
+      <ol class="sub">
+        <li><a href="https://github.com/luxxy132-netizen/indie-radar-public">이 저장소 페이지</a>를 엽니다.</li>
+        <li>화면 <b>오른쪽 위</b>에 있는 <span class="kbd">Fork</span> 버튼을 누릅니다.</li>
+        <li>넘어간 화면에서 초록색 <span class="kbd">Create fork</span> 버튼을 누릅니다.</li>
+        <li>잠시 기다리면 <code>내계정이름/indie-radar-public</code>이라는 내 저장소가 생깁니다. 지금부터 아래 모든 작업은 <b>이 새로 생긴 내 저장소</b>에서 합니다.</li>
+      </ol>
+      <p class="tip">💡 명단에 슬랙 ID · 스팀 주소가 들어가니, 저장소를 비공개로 바꾸는 걸 권합니다: 내 저장소 페이지 → 위쪽 탭 <span class="kbd">Settings</span> → 맨 아래로 스크롤 → <b>Danger Zone</b> → <b>Change repository visibility</b> → <b>Change to private</b></p>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="num">2</span> 비밀 값 두 개 넣기 (Secrets)</h3>
+      <ol class="sub">
+        <li>내 저장소 페이지 위쪽 탭에서 <span class="kbd">Settings</span>를 누릅니다.</li>
+        <li>왼쪽 메뉴에서 <span class="kbd">Secrets and variables</span>를 누르고, 펼쳐지면 그 아래 <span class="kbd">Actions</span>를 누릅니다.</li>
+        <li><b>Secrets</b> 탭이 선택된 상태에서 초록색 <span class="kbd">New repository secret</span> 버튼을 누릅니다.</li>
+        <li>Name 칸에 <code>SLACK_BOT_TOKEN</code>, Secret 칸에 슬랙에서 발급받은 토큰(<code>xoxb-</code>로 시작)을 붙여넣고 <span class="kbd">Add secret</span>을 누릅니다.</li>
+        <li>같은 방법으로 한 번 더: Name에 <code>STEAM_API_KEY</code>, Secret에 스팀에서 발급받은 키를 넣고 저장합니다.</li>
+      </ol>
+      <p class="tip">💡 슬랙 토큰은 슬랙 앱 설정의 <b>OAuth &amp; Permissions</b>에서, 스팀 키는 <b>steamcommunity.com/dev/apikey</b>에서 발급받습니다. (자세한 방법은 README 참고)</p>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="num">3</span> 매일 수집 켜기 (Variables)</h3>
+      <ol class="sub">
+        <li>2번과 같은 화면에서, <b>Secrets</b> 옆에 있는 <span class="kbd">Variables</span> 탭을 누릅니다.</li>
+        <li><span class="kbd">New repository variable</span> 버튼을 누릅니다.</li>
+        <li>Name 칸에 <code>RADAR_ENABLED</code>, Value 칸에 <code>true</code>를 입력하고 <span class="kbd">Add variable</span>을 누릅니다.</li>
+      </ol>
+    </div>
+
+    <div class="setup-step">
+      <h3><span class="num">4</span> 받는 사람 추가하기</h3>
+      <ol class="sub">
+        <li>내 저장소의 파일 목록에서 <code>subscribers.yaml</code> 파일을 누릅니다.</li>
+        <li>오른쪽 위 연필 모양 아이콘(<b>Edit this file</b>)을 누릅니다.</li>
+        <li>받는 사람의 슬랙 멤버 ID와 스팀 프로필 주소를 한 줄씩 적습니다. 적는 형식은 파일 안에 예시로 나와 있습니다.</li>
+        <li>오른쪽 위 초록색 <span class="kbd">Commit changes...</span> 버튼을 누르고, 다시 뜨는 창에서 한 번 더 <span class="kbd">Commit changes</span>를 누르면 저장됩니다.</li>
+      </ol>
+      <p class="tip">💡 그다음 돌아오는 월요일 아침 8시에 첫 DM이 옵니다. 기다리지 않고 바로 확인하고 싶다면, 위쪽 탭 <span class="kbd">Actions</span> → 왼쪽 <span class="kbd">collect</span> 클릭 → 오른쪽 <span class="kbd">Run workflow</span>에서 <code>report</code>를 체크하고 실행하면 그 자리에서 보낼 수 있습니다.</p>
+    </div>
+
+  </div>
+  <p class="note">더 자세한 설명은 저장소의 <a href="https://github.com/luxxy132-netizen/indie-radar-public#readme">README</a>에 있습니다.</p>
   <div class="stack" style="margin-top:18px">
     <span>Python 3.12</span><span>GitHub Actions</span><span>Steam Web API · Store API</span><span>Slack Block Kit</span><span>pytest · 테스트 218개</span>
   </div>

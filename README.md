@@ -30,16 +30,43 @@ DM에는 이번 주 추천 게임 목록(상점 링크)과, 게임마다 대표 
 
 ## 직접 써 보기
 
-1. 이 저장소를 가져갑니다(Fork 또는 코드 복사). **받는 사람 명단에 슬랙 ID가 들어가니 비공개 저장소를 권합니다**
-2. **Settings → Secrets and variables → Actions → Secrets**에 두 개를 넣습니다. 값은 코드 · 채팅 · 로그 어디에도 남기지 않습니다
+아래에서 **Settings**는 전부 "이 저장소만의 설정" 화면입니다. GitHub 계정 설정이 아니라, 저장소를 열어 둔 상태에서 위쪽에 있는 탭 중 하나예요.
 
-   | 이름 | 어디서 | 쓰는 곳 |
-   |---|---|---|
-   | `SLACK_BOT_TOKEN` | 슬랙 앱 → OAuth & Permissions → Bot Token Scopes에 `chat:write` 추가 → 설치 → `xoxb-` 토큰. App Home에서 Messages Tab 켜기 | DM 발송 |
-   | `STEAM_API_KEY` | steamcommunity.com/dev/apikey | 받는 사람의 스팀 라이브러리 읽기 |
+### 1. 내 계정으로 저장소 복사하기 (Fork)
 
-3. 같은 화면의 **Variables** 탭에 `RADAR_ENABLED` = `true`를 넣습니다. 이게 있어야 매일 수집이 돕니다
-4. `subscribers.yaml`에 받는 사람을 적습니다
+1. [이 저장소 페이지](https://github.com/luxxy132-netizen/indie-radar-public)를 엽니다
+2. 화면 **오른쪽 위**에 있는 `Fork` 버튼을 누릅니다
+3. 넘어간 화면에서 초록색 `Create fork` 버튼을 누릅니다
+4. 잠시 기다리면 `내계정이름/indie-radar-public`이라는 내 저장소가 생깁니다. **지금부터는 이 새로 생긴 내 저장소**에서 작업합니다
+
+> 💡 받는 사람 명단에 슬랙 ID · 스팀 주소가 들어가니, 저장소를 비공개로 바꾸는 걸 권합니다: 내 저장소 페이지 → 위쪽 `Settings` 탭 → 페이지 맨 아래로 스크롤 → **Danger Zone** → **Change repository visibility** → **Change to private**
+
+### 2. 비밀 값 두 개 넣기 (Secrets)
+
+1. 내 저장소 페이지 위쪽 탭에서 `Settings`를 누릅니다
+2. 왼쪽 메뉴에서 `Secrets and variables`를 누르고, 펼쳐지면 그 아래 `Actions`를 누릅니다
+3. **Secrets** 탭이 선택된 상태에서 초록색 `New repository secret` 버튼을 누릅니다
+4. 아래 표대로 Name과 Secret을 채우고 `Add secret`을 누릅니다. 이 값들은 코드 · 채팅 · 로그 어디에도 남지 않습니다
+
+   | Name(이름) | Secret(값)을 어디서 받나 |
+   |---|---|
+   | `SLACK_BOT_TOKEN` | 슬랙 앱 → `OAuth & Permissions` → `Bot Token Scopes`에 `chat:write` 추가 → 앱 설치 → 생성된 `xoxb-`로 시작하는 토큰 복사. App Home에서 Messages Tab도 켜 둘 것 |
+   | `STEAM_API_KEY` | steamcommunity.com/dev/apikey 접속 → 발급받은 키 복사 |
+
+5. 4번을 두 번 반복해서 `SLACK_BOT_TOKEN`, `STEAM_API_KEY` 둘 다 넣습니다
+
+### 3. 매일 수집 켜기 (Variables)
+
+1. 2번과 같은 화면에서, **Secrets** 옆에 있는 `Variables` 탭을 누릅니다
+2. `New repository variable` 버튼을 누릅니다
+3. Name 칸에 `RADAR_ENABLED`, Value 칸에 `true`를 입력하고 `Add variable`을 누릅니다. 이게 있어야 매일 수집이 돕니다
+
+### 4. 받는 사람 추가하기
+
+1. 내 저장소의 파일 목록에서 `subscribers.yaml` 파일을 누릅니다
+2. 오른쪽 위 연필 모양 아이콘(`Edit this file`)을 누릅니다
+3. 아래 예시처럼 받는 사람을 한 명씩 적습니다
+4. 오른쪽 위 초록색 `Commit changes...` 버튼을 누르고, 다시 뜨는 창에서 한 번 더 `Commit changes`를 누르면 저장됩니다
 
 ```yaml
 subscribers:
@@ -52,7 +79,8 @@ subscribers:
 
 - 받는 사람은 스팀 개인정보 설정에서 **게임 세부 정보 · 총 플레이 시간**을 공개로 둬야 합니다
 - 슬랙 게스트 · 외부(슬랙 커넥트) 계정에는 봇이 DM을 보낼 수 없습니다
-- 첫 DM 전에 **Actions → measure → Run workflow**(subscriber에 id)로 취향을 미리 볼 수 있습니다(파일을 쓰지 않음)
+- 첫 DM 전에 위쪽 `Actions` 탭 → 왼쪽 `measure` → 오른쪽 `Run workflow`에서 subscriber에 id를 넣고 실행하면 취향을 미리 볼 수 있습니다(파일을 쓰지 않음)
+- 첫 DM은 다음 월요일 아침 8시에 옵니다. 기다리지 않고 바로 확인하려면 위쪽 `Actions` 탭 → 왼쪽 `collect` → 오른쪽 `Run workflow`에서 `report`를 체크하고 실행하세요
 - 월요일 발송은 지난 7일치가 쌓여 있어야 제대로 나옵니다 — 매일 수집을 켠 뒤 일주일쯤 기다리세요
 
 ## 수동 실행
