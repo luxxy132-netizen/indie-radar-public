@@ -1,0 +1,180 @@
+# 인디게임 레이더 — 매일 수집 · 품질 점검 · 적재, 월요일엔 주간 추천까지
+#
+# 한국 시간 08:00 = UTC 23:00(전날). GitHub의 schedule은 부하에 따라 수십 분 늦게 시작할 수 있지만,
+# 수집 대상일은 실행 시각이 아니라 KST 날짜로 정해지므로(collect.py target_window) 자정 전에만 돌면 결과가 같다.
+#
+# 단위 테스트는 여기서 돌리지 않는다(test.yml). 테스트가 먼저 실패해 수집이 멈추면 그날 출시작은
+# 영영 못 받는다 — 대상일이 항상 "어제"라서다. 수집(증거)이 테스트보다 먼저다.
+#
+# 주간 리포트는 따로 알람을 두지 않고 이 워크플로의 마지막 단계로 돈다. 따로 돌리면 월요일 08:00
+# 수집과 겹쳐 일요일 출시분이 아직 적재 전일 수 있다(2026-09-10 설계).
+#
+# 단계 조건에 always() 대신 !cancelled()를 쓴다 — 취소 · 시간 초과된 실행에서 불완전한 데이터로
+# 슬랙을 보내거나 커밋하지 않기 위해서다(코드 리뷰 2026-09-10).
+name: collect
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+  workflow_dispatch:
+    inputs:
+      report:
+        description: "주간 리포트도 실행 (월요일이 아니어도)"
+        type: boolean
+        default: false
+      force_report:
+        description: "이미 보낸 주도 슬랙에 다시 보내기"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write     # raw/ · qa/ · data/ · report/ 를 저장소에 커밋
+  issues: write       # 실패 시 이슈 생성
+
+concurrency:
+  group: collect      # 두 실행이 겹치지 않게 — 같은 날짜 원본을 동시에 쓰는 일을 막는다
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    # 코드 공개용 저장소에선 돌지 않는다. 가져가서 쓸 땐 Settings → Secrets and variables → Actions →
+    # Variables에 RADAR_ENABLED = true (README "직접 써 보기")
+    if: ${{ vars.RADAR_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 실패한 실행을 Re-run하면 기본값으로는 "처음 실행 때의 커밋"을 받는다. 그러면 그사이 봇이 올린
+          # raw/ · report/ 가 안 보여서 같은 날을 또 수집하고, 이미 보낸 주를 슬랙에 또 보낸다.
+          # 브랜치 최신을 받아 두 가지를 다 막는다(코드 리뷰 2026-09-10).
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성
+        run: pip install -r requirements.txt
+
+      - name: 실행일 (KST)
+        id: day
+        run: |
+          echo "day=$(TZ=Asia/Seoul date +%F)" >> "$GITHUB_OUTPUT"
+          echo "weekday=$(TZ=Asia/Seoul date +%u)" >> "$GITHUB_OUTPUT"   # 1 = 월요일
+
+      - name: 수집
+        id: collect
+        run: |
+          set +e
+          python collect.py
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # 0 정상 · 1 끝내 실패했거나 대상일을 다 못 덮음(원본은 저장됨) · 2 오늘자 원본이 이미 있음
+          # 1이어도 여기서 멈추지 않는다 — 원본을 커밋하고 점검 결과를 남긴 뒤 마지막 단계에서 실패 처리한다
+          exit 0
+
+      - name: 품질 점검 (/steam-qa)
+        id: qa
+        if: steps.collect.outputs.rc != '2'
+        env:
+          RAW: raw/${{ steps.day.outputs.day }}.json
+        run: |
+          set +e
+          # 파일을 콕 집어 넘긴다. 수집이 원본을 못 쓰고 죽었을 때 qa.py가 "가장 최근"인 어제 원본을
+          # 다시 점검하고 통과해 버리면 안 된다.
+          if [ ! -f "$RAW" ]; then
+            echo "::error::$RAW 가 없다 — 수집 단계 로그를 볼 것"
+            echo "rc=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python qa.py "$RAW"
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # 구독자(subscribers.yaml)마다 스팀 라이브러리로 취향을 다시 만든다. 비밀값은 쓰는 단계에만 넘긴다 —
+      # 스팀 키는 여기, 슬랙 토큰은 리포트 단계(2026-09-11 개인 DM 전환)
+      - name: 취향 갱신 (월요일 · 또는 수동 실행 옵션)
+        id: profiles
+        if: ${{ !cancelled() && (steps.day.outputs.weekday == '1' || inputs.report) }}
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+        run: |
+          set +e
+          # 0 전원 정상 · 1 누구라도 새로 못 만듦 — 지난 취향 파일이 있으면 리포트는 그걸로 보내고, 이슈가 열린다
+          python build_user_profiles.py
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: 주간 리포트 (월요일 · 또는 수동 실행 옵션)
+        id: report
+        if: ${{ !cancelled() && (steps.day.outputs.weekday == '1' || inputs.report) }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          DAY: ${{ steps.day.outputs.day }}
+          FORCE: ${{ inputs.force_report && '--force' || '' }}
+        run: |
+          set +e
+          # 사람마다 슬랙 개인 DM. 0 정상(토큰 없음 · 이미 보냄 포함) · 1 누구라도 전송 실패 · 취향 파일 없음 ·
+          # 명단 비었음 · 7일 전부 적재 없음 — 리포트 파일은 남는다
+          python report.py --date "$DAY" $FORCE
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: 원본 · 점검 결과 · 적재 · 리포트 커밋
+        id: commit
+        if: ${{ !cancelled() }}
+        env:
+          DAY: ${{ steps.day.outputs.day }}
+        run: |
+          git config user.name "indie-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # data/ 는 점검을 통과한 날에만, report/ 는 리포트를 돌린 날에만 생긴다 — 없는 경로를 git add 하면 단계가 죽는다
+          for d in raw qa data report profiles; do
+            if [ -e "$d" ]; then git add "$d"; fi
+          done
+          if git diff --cached --quiet; then
+            echo "커밋할 변경 없음"
+          else
+            git commit -m "data: $DAY 수집 · 점검"
+            git push
+          fi
+
+      - name: 실패 시 이슈 생성
+        # 앞 단계(커밋)가 실패해도 돌아야 한다 — 기본값 success()면 push가 거절될 때 이슈가 안 열린다
+        if: ${{ !cancelled() && (steps.collect.outputs.rc == '1' || steps.qa.outputs.rc == '1' || steps.profiles.outputs.rc == '1' || steps.report.outputs.rc == '1' || steps.commit.outcome == 'failure') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DAY: ${{ steps.day.outputs.day }}
+          SUMMARY: ${{ steps.qa.outputs.summary }}
+          REPORT: ${{ steps.report.outputs.report }}
+          COLLECT_RC: ${{ steps.collect.outputs.rc }}
+          QA_RC: ${{ steps.qa.outputs.rc }}
+          PROFILES_RC: ${{ steps.profiles.outputs.rc }}
+          REPORT_RC: ${{ steps.report.outputs.rc }}
+          COMMIT: ${{ steps.commit.outcome }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          # 제목에는 실패한 단계만 적는다(돌지 않은 단계는 빈칸이라 빼고)
+          FAILED=""
+          [ "$COLLECT_RC" = "1" ] && FAILED="$FAILED 수집"
+          [ "$QA_RC" = "1" ] && FAILED="$FAILED 점검"
+          [ "$PROFILES_RC" = "1" ] && FAILED="$FAILED 취향갱신"
+          [ "$REPORT_RC" = "1" ] && FAILED="$FAILED 주간리포트"
+          [ "$COMMIT" = "failure" ] && FAILED="$FAILED 커밋"
+          : > issue.md
+          if [ -n "$SUMMARY" ] && [ -f "$SUMMARY" ]; then cat "$SUMMARY" >> issue.md; fi
+          if [ "$PROFILES_RC" = "1" ] && [ -f profiles/_last_run.json ]; then
+            { printf '\n## 취향 갱신\n\n```\n'; cat profiles/_last_run.json; printf '\n```\n'; } >> issue.md
+          fi
+          if [ "$REPORT_RC" = "1" ] && [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
+            { printf '\n## 주간 리포트\n\n'; cat "$REPORT"; } >> issue.md
+          fi
+          if [ "$COMMIT" = "failure" ]; then
+            printf '\n## 커밋 실패\n\n원본 · 점검 결과가 저장소에 안 올라갔다. 주간 리포트를 보냈다면 "보냄" 기록도 안 올라갔으니, 다시 실행하기 전에 로그를 볼 것.\n' >> issue.md
+          fi
+          if [ ! -s issue.md ]; then printf '요약 파일이 없다 — 실행 로그를 볼 것.\n' > issue.md; fi
+          printf '\n---\n실행 로그: %s\n' "$RUN_URL" >> issue.md
+          gh issue create --title "[레이더 실패] $DAY —${FAILED}" --body-file issue.md
+          exit 1

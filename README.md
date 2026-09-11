@@ -1,0 +1,111 @@
+# 🎮 인디게임 레이더
+
+매일 스팀 신작을 모으고, 매주 월요일 아침 **내 취향에 맞는 인디게임만 슬랙 개인 DM으로** 받는 도구입니다.
+서버 없이 GitHub Actions만으로 돌아갑니다.
+
+**소개 페이지** → https://luxxy132-netizen.github.io/indie-radar-public/
+
+> 이 저장소는 코드를 공개하기 위한 곳입니다. 실제 운영은 비공개 저장소에서 돌아가고, 받는 사람 명단 · 취향 · 수집 데이터는 여기에 없습니다.
+> 여기서는 매일 수집이 꺼져 있습니다(아래 "직접 써 보기"의 `RADAR_ENABLED`).
+
+## 무엇을 하나
+
+| 언제 | 무엇을 |
+|---|---|
+| 매일 08:00 (KST) | 전날 출시된 스팀 게임을 모으고(`collect.py`), 품질을 점검한 뒤(`qa.py`) 통과한 것만 쌓는다(`data/`) |
+| 매주 월요일 08:00 | 받는 사람마다 취향을 새로 만들고(`build_user_profiles.py`), 지난 7일 신작에서 골라 슬랙 DM으로 보낸다(`report.py`) |
+
+DM에는 이번 주 추천 게임 목록(상점 링크)과, 게임마다 대표 이미지 · 가격 · 출시일 · 리뷰 · 추천 이유 · 한 줄 소개가 담긴 카드가 들어갑니다.
+
+## 추천은 어떻게 고르나
+
+1. **취향**: 좋아하는 게임들의 스팀 공식 태그 중, 여러 게임에 공통으로 나오는 태그를 취향으로 친다
+   - 스팀 라이브러리의 플레이 시간 상위 게임(소프트웨어 제외) + 좋아하는 게임 링크 → `profiles/{id}.json`
+   - 또는 직접 고른 게임 목록(`seed_library.yaml` → `peek.py` → `build_profile.py` → `profile.json`)
+2. **드문 태그**: 그 주 신작 중 10% 이하에만 붙은 취향 태그를 "드문 태그"로 본다 — Indie처럼 흔한 태그는 점수가 거의 0
+3. **기준**: 드문 취향 태그가 2개 이상 겹치는 신작만 통과, 점수순 최대 10개. 약한 주에는 억지로 채우지 않는다
+
+규칙 값은 모두 `seed_library.yaml`의 `profile_rules` · `match_rules` · `user_profile_rules`에 있습니다.
+성인 콘텐츠 태그(Sexual Content 등)는 누구의 취향 태그에도 넣지 않습니다.
+
+## 직접 써 보기
+
+1. 이 저장소를 가져갑니다(Fork 또는 코드 복사). **받는 사람 명단에 슬랙 ID가 들어가니 비공개 저장소를 권합니다**
+2. **Settings → Secrets and variables → Actions → Secrets**에 두 개를 넣습니다. 값은 코드 · 채팅 · 로그 어디에도 남기지 않습니다
+
+   | 이름 | 어디서 | 쓰는 곳 |
+   |---|---|---|
+   | `SLACK_BOT_TOKEN` | 슬랙 앱 → OAuth & Permissions → Bot Token Scopes에 `chat:write` 추가 → 설치 → `xoxb-` 토큰. App Home에서 Messages Tab 켜기 | DM 발송 |
+   | `STEAM_API_KEY` | steamcommunity.com/dev/apikey | 받는 사람의 스팀 라이브러리 읽기 |
+
+3. 같은 화면의 **Variables** 탭에 `RADAR_ENABLED` = `true`를 넣습니다. 이게 있어야 매일 수집이 돕니다
+4. `subscribers.yaml`에 받는 사람을 적습니다
+
+```yaml
+subscribers:
+  - id: me                       # 영어 소문자 · 숫자만
+    slack_user: U0123ABCD        # 봇이 있는 워크스페이스에서: 프로필 → ⋮ → 멤버 ID 복사
+    steam_profile: https://steamcommunity.com/id/이름
+    favorites:                   # 선택. 스팀 프로필 없이 이것만 쓰려면 8개 이상
+      - https://store.steampowered.com/app/413150/Stardew_Valley/
+```
+
+- 받는 사람은 스팀 개인정보 설정에서 **게임 세부 정보 · 총 플레이 시간**을 공개로 둬야 합니다
+- 슬랙 게스트 · 외부(슬랙 커넥트) 계정에는 봇이 DM을 보낼 수 없습니다
+- 첫 DM 전에 **Actions → measure → Run workflow**(subscriber에 id)로 취향을 미리 볼 수 있습니다(파일을 쓰지 않음)
+- 월요일 발송은 지난 7일치가 쌓여 있어야 제대로 나옵니다 — 매일 수집을 켠 뒤 일주일쯤 기다리세요
+
+## 수동 실행
+
+**Actions → collect → Run workflow**
+
+| 옵션 | 뜻 |
+|---|---|
+| `report` | 월요일이 아니어도 이번 주 추천을 만들어 보낸다 |
+| `force_report` | 이미 보낸 주도 다시 보낸다 |
+
+## 실패하면
+
+조용히 넘어가지 않습니다. 수집 · 점검 · 취향 갱신 · 발송 중 하나라도 실패하면 **GitHub 이슈**가 열리고, 무엇이 왜 실패했는지 적힙니다.
+
+- 한 사람의 실패가 다른 사람의 발송을 막지 않는다
+- 누군가의 스팀 프로필이 비공개로 바뀌면 지난 취향으로 보내고 이슈로 알린다
+- 날짜가 붙은 기록 파일은 덮어쓰지 않는다(다시 돌리면 `-2`, `-3` …)
+- 슬랙이 이미지 하나를 못 가져와 메시지 전체를 거절하면, 이미지만 빼고 한 번 더 보낸다
+
+## 파일
+
+```
+collect.py              매일 수집 — 스팀 공식 API(키 없음)로 전날 출시작 · 태그 · 리뷰 → raw/
+qa.py                   품질 점검 15항목 → qa/, 통과한 날만 data/
+build_user_profiles.py  받는 사람 취향(스팀 라이브러리 + 좋아하는 게임 → profiles/)
+build_profile.py        직접 고른 게임 목록으로 취향 만들기(seed_library.yaml → profile.json)
+peek.py                 직접 고른 게임 이름 → 스팀 appid 해석(build_profile.py의 입력)
+report.py               주간 추천 · 슬랙 DM → report/
+user_profile_probe.py   취향 기준값 재기(measure.yml에서)
+profile_probe.py        태그 기준 측정(초기 작업)
+
+seed_library.yaml       직접 고른 게임(예시) · 모든 규칙 값
+subscribers.yaml        받는 사람 명단(비어 있음)
+.github/workflows/      collect.yml(매일 · 월요일) · test.yml(코드 바뀔 때 테스트) · measure.yml(수동)
+docs/index.html         소개 페이지(GitHub Pages)
+```
+
+코드 주석의 "실패 N번", "HANDOFF", "코드 리뷰 날짜"는 비공개 작업 기록을 가리킵니다 — 왜 그렇게 만들었는지의 흔적으로 남겨 두었습니다.
+
+## 로컬에서
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+python -m pytest -q test_collect.py test_qa.py test_build_profile.py test_report.py test_build_user_profiles.py
+```
+
+테스트는 네트워크를 부르지 않습니다. Python 3.12.
+
+## 보안 · 개인정보
+
+- 비밀값(스팀 키 · 슬랙 토큰)은 GitHub Secrets에만 두고, 오류 기록 · 리포트 · 로그에 남지 않도록 테스트로 확인합니다. 키가 들어가는 호출은 오류에 예외 종류와 HTTP 코드만 남깁니다
+- 받는 사람의 스팀 보유 게임 전체 목록과 스팀 고유번호는 저장하지 않습니다(취향에 쓴 게임만)

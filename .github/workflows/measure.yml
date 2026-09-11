@@ -1,0 +1,47 @@
+# 구독자 취향 기준값 재기(user_profile_probe.py) — 수동 실행만.
+# 스팀 키가 GitHub Secrets에만 있어서 여기서 돈다. 파일을 쓰지도 커밋하지도 않는다 — 결과는 실행 로그 · 요약에만.
+name: measure
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscriber:
+        description: "잴 사람 id (subscribers.yaml에 profile_path와 steam_profile이 둘 다 있어야 한다)"
+        default: "owner"
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성
+        run: pip install -r requirements.txt
+
+      # 새로 추가한 사람의 취향을 DM 보내기 전에 미리 본다 — 파일을 쓰지 않는다(--dry-run)
+      - name: 취향 미리보기
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          WHO: ${{ inputs.subscriber }}
+        run: python build_user_profiles.py --only "$WHO" --dry-run
+
+      # 지금 취향(profile_path)이 있는 사람만 비교할 기준이 있다
+      - name: 기준값 재기 (지금 취향과 비교)
+        env:
+          STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+          WHO: ${{ inputs.subscriber }}
+        run: |
+          if python -c "import sys, build_user_profiles as b; s = [x for x in b.load_subscribers() if x['id'] == sys.argv[1]]; sys.exit(0 if s and s[0].get('profile_path') and s[0].get('steam_profile') else 1)" "$WHO"; then
+            python user_profile_probe.py --only "$WHO"
+          else
+            echo "$WHO: 비교할 지금 취향(profile_path)이 없어 건너뜀"
+          fi

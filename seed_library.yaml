@@ -1,0 +1,77 @@
+# seed_library.yaml — 직접 고른 게임으로 취향을 만들 때의 입력 + 모든 규칙 값.
+# 게임 목록은 예시다(원래 목록은 공개하지 않는다). 스팀 프로필로 취향을 만드는 사람(subscribers.yaml)은 games를 쓰지 않는다.
+# 순서: games 이름 → peek.py(스팀 appid 해석 → peek_results_*.csv) → build_profile.py(→ profile.json)
+#       → subscribers.yaml에 profile_path: profile.json
+
+games:
+  - Stardew Valley
+  - Hades
+  - Celeste
+  - Hollow Knight
+  - Terraria
+  - Slay the Spire
+  - Unpacking
+  - A Short Hike
+  - DREDGE
+  - Spiritfarer
+
+# Steam에 없는 게임 — 해석을 시도하지 않고 분모에서도 뺀다. 예: [League of Legends]
+not_on_steam: []
+
+# ---- 아래 둘은 수작업 보정. 자동 해석률을 더럽히지 않도록 games와 분리해 둔다 ----
+
+# aliases: 이름만 바꾸면 검색으로 찾아진다. storesearch는 한글 이름을 못 찾는다(2026-09-10 실측).
+#   예: 스타듀 밸리: Stardew Valley
+aliases: {}
+
+# pinned: 검색 결과에 정답이 아예 안 나와서 appid를 직접 박는다. 이름이 짧으면 긴 이름들에 밀린다.
+#   예: Hue: 383270
+pinned: {}
+
+profile_rules:
+  include_types: [game]         # type 기준(dlc·demo 등 제외). type=game인 소프트웨어는 장르 ID 50~59로 따로 뺀다(실패 6번)
+  tags_per_game: 5              # 게임당 SteamSpy 태그 득표순 상위 N개만 본다. 2026-09-10 실측으로 확정
+  min_tag_count: 3              # 3개 이상 게임에서 나온 태그만 취향으로 인정. 올리면 일반 태그만 남는다(실측)
+  tag_stoplist:                 # 취향이 아니라 플레이 인원 정보 — categories와 겹친다. 먼저 빼고 top N을 뽑는다
+    - Singleplayer
+    - Multiplayer
+    - Co-op
+    - Online Co-Op
+    - Local Co-Op
+    - Local Multiplayer         # 위 5개를 빼자 빈 top5 자리를 채우고 들어옴(3개 게임) — 같은 부류라 추가
+    - 4 Player Local            # 이하 4개는 현재 min 3 미달. Steam categories에 있는 항목이라 같은 근거로 추가
+    - Split Screen
+    - PvP
+    - Massively Multiplayer
+  min_tag_coverage: 0.9         # 시드 중 태그가 있는 게임 비율 하한. 미달이면 profile.json을 만들지 않는다 (⑥, 2026-09-10 잠정)
+                                # SteamSpy 시절엔 0.72(33/46)였다 — 이 게이트가 있었다면 실패 5·8번을 그 자리에서 막았다
+  min_auto_resolution: 0.7      # 시드 이름 자동 해석률 하한(별칭·pinned 수작업 제외). 2026-09-10 실측 0.74 (잠정)
+  dedupe_variants: true         # 본편/테스트서버/구버전 빌드는 하나로 취급
+
+# 주간 슬랙 추천 규칙 — 2026-09-10 사람과 함께 정함. 처음 2주는 잠정, 실제 주간 데이터로 재측정한다.
+# profile_rules와 달리 시드 지문에 들어가지 않는다 — 바꿔도 profile.json을 다시 만들 필요가 없다.
+match_rules:
+  weekly_max: 10                # 기준을 넘은 것 중 점수순 최대 N개. 약한 주엔 억지로 채우지 않는다
+  tags_per_new_game: 10         # 신작 태그를 가중치순 상위 몇 개까지 볼지(제외목록을 뺀 뒤)
+  rare_max_ratio: 0.10          # '드문 태그' = 그 주 신작 중 이 비율 이하에만 붙은 취향 태그
+  min_rare_tags: 2              # 드문 취향 태그가 이 개수 이상 겹쳐야 추천 (9/9 실측: 하루 103개 중 17개 통과)
+
+# 구독자 취향(스팀 프로필 + 좋아하는 게임 링크) 규칙 — build_user_profiles.py. 게임당 태그 수 · 제외목록은 profile_rules를 쓴다.
+# 실측(2026-09-11, measure.yml): 시드 22개에 min 3이면 태그 11개로 Cozy · Puzzle 같은 취향이 전부 빠졌고, min 2면 24개.
+#   좋아하는 게임 링크만: 8개 · min 2 → 태그 평균 7개, min 3 → 1.2개(20회 중 6회 빈 취향)
+#   → 시드가 적으면 2, 많으면 3(흔한 태그가 덜 끼게). 링크만 쓰는 사람은 8개 이상
+# 시드 지문에 들어가지 않는다 — 바꿔도 profile.json을 다시 만들 필요가 없다.
+user_profile_rules:
+  top_n: 30                     # 플레이 시간 상위 몇 개 게임을 시드로 쓸지(소프트웨어를 뺀 뒤). 실측: 30 · 50 차이 없음
+  min_playtime_min: 60          # 이보다 짧게 한 게임은 시드 후보에서 뺀다(분)
+  candidate_factor: 3           # 후보를 top_n의 몇 배까지 상점에 물어볼지 — 소프트웨어 · 지역 제한으로 빠지는 몫
+  large_seed_games: 30          # 태그가 있는 시드 게임이 이 이상이면 min_tag_count, 적으면 min_tag_count_small
+  min_tag_count: 3              # 시드가 많을 때: 이 개수 이상 시드 게임에서 나온 태그만 취향으로 인정
+  min_tag_count_small: 2        # 시드가 적을 때
+  min_seed_games: 8             # 태그가 있는 시드 게임이 이보다 적으면 취향을 만들지 않는다(링크만이면 8개부터 쓸 만함)
+  min_profile_tags: 6           # 취향 태그가 이보다 적으면 만들지 않는다(얇은 취향은 흔한 태그만 남는다)
+  exclude_tags:                 # 누구의 취향 태그에도 넣지 않는다(추천 이유가 되지 않게). 스팀 공식 태그 이름.
+    - Sexual Content            #   구독자 취향은 만들 때 제외목록처럼 먼저 빼고, profile.json은 리포트가 읽을 때 뺀다.
+    - Nudity                    #   다른 태그로 추천된 신작에 성인 요소가 있는 건 막지 않는다
+    - Sexual Themes
+    - Hentai

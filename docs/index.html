@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인디게임 레이더</title>
+<meta name="description" content="매일 스팀 신작을 모으고, 매주 월요일 내 취향에 맞는 인디게임만 슬랙 DM으로 받는 도구">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+<style>
+  :root {
+    --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1b1a; --muted: #6b6760; --line: #e4e1da;
+    --accent: #2f7d62; --accent-soft: #e3f1ea; --warn: #b4572b; --code: #f0eee9;
+    --slack: #ffffff; --slack-line: #e8e8e8; --link: #1264a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1d1c1b; --ink: #ecebe8; --muted: #a29e96; --line: #2f2d2a;
+      --accent: #5cc49b; --accent-soft: #1f3129; --warn: #e08a5e; --code: #262523;
+      --slack: #1a1d21; --slack-line: #34373c; --link: #4ea3e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.65 "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; }
+  a { color: var(--link); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  header { padding: 72px 0 40px; }
+  .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .04em; font-size: 14px; }
+  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.15; margin: 10px 0 16px; letter-spacing: -.02em; }
+  .lead { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0; }
+  .cta { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 11px 18px; border-radius: 10px; font-weight: 700; text-decoration: none;
+         border: 1px solid var(--line); color: var(--ink); background: var(--panel); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  section { padding: 40px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 26px; margin: 0 0 8px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .num { display: inline-flex; width: 28px; height: 28px; border-radius: 50%; align-items: center; justify-content: center;
+         background: var(--accent-soft); color: var(--accent); font-weight: 800; font-size: 14px; margin-bottom: 10px; }
+
+  /* 슬랙 DM 모양 흉내 */
+  .dm-layout { display: grid; gap: 28px; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: start; }
+  @media (max-width: 760px) { .dm-layout { grid-template-columns: 1fr; } }
+  .slack { background: var(--slack); border: 1px solid var(--slack-line); border-radius: 12px; padding: 16px 18px;
+           font-family: "Lato", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; font-size: 15px; }
+  .who { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; font-size: 20px; }
+  .who b { font-size: 15px; } .who span { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  .app { font-size: 10px; background: var(--code); color: var(--muted); padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+  .msg p { margin: 0 0 4px; }
+  .msg ol { margin: 6px 0 10px; padding-left: 22px; }
+  .msg a { text-decoration: none; }
+  .divider { border: 0; border-top: 1px solid var(--slack-line); margin: 12px 0; }
+  .shot { border-radius: 8px; aspect-ratio: 920 / 430; margin: 8px 0 6px; display: grid; place-items: center;
+          color: #fff; font-weight: 800; font-size: 22px; letter-spacing: .02em; text-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .shot.a { background: linear-gradient(135deg, #2a5d4f, #7fb77e 60%, #f3d38a); }
+  .shot.b { background: linear-gradient(135deg, #3b2f63, #8a5fb8 55%, #f0a3a3); }
+  .lines p { margin: 0; line-height: 1.55; }
+  .ctx { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 18px; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-weight: 700; font-size: 15px; }
+  .step small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; }
+  .arrow { color: var(--muted); font-size: 18px; }
+  .when { font-size: 13px; font-weight: 800; color: var(--accent); min-width: 110px; }
+
+  .example { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-top: 16px; }
+  .example table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .example th, .example td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  .example th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 13px; background: var(--code); }
+  .tag.rare { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  .ok { color: var(--accent); font-weight: 800; } .no { color: var(--warn); font-weight: 800; }
+  .scroll { overflow-x: auto; }
+
+  ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  ul.checks li { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  ul.checks b { display: block; }
+  ul.checks span { color: var(--muted); font-size: 15px; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
+  ol.setup { padding-left: 20px; } ol.setup li { margin-bottom: 8px; }
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stack span { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: 14px; }
+  footer { padding: 36px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">STEAM × SLACK · GITHUB ACTIONS</div>
+  <h1>🎮 인디게임 레이더</h1>
+  <p class="lead">스팀에는 하루 100개가 넘는 신작이 나옵니다. 매일 전부 모아 두고, 월요일 아침마다 <b>내 취향에 맞는 것만</b> 슬랙 DM으로 받습니다. 서버 없이 GitHub Actions만으로요.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/luxxy132-netizen/indie-radar-public">GitHub 저장소</a>
+    <a class="btn" href="#setup">직접 써 보기</a>
+  </div>
+</header>
+
+<section>
+  <h2>월요일 아침, 이런 DM이 옵니다</h2>
+  <p class="sub">위에는 한눈에 보는 목록, 아래에는 게임마다 대표 이미지와 카드. 두 게임마다 구분선이 들어갑니다.</p>
+  <div class="dm-layout">
+    <div class="slack" aria-label="슬랙 DM 예시">
+      <div class="who"><div class="avatar">🎮</div><div><b>인디게임 레이더</b><span class="app">앱</span><span>오전 8:02</span></div></div>
+      <div class="msg">
+        <p><b>🎮 인디게임 레이더</b><br>9/7(월) ~ 9/13(일) 출시작</p>
+        <ol>
+          <li><a href="#">Moss Lantern</a></li>
+          <li><a href="#">Tidebound Café</a></li>
+          <li><a href="#">…</a></li>
+        </ol>
+        <hr class="divider">
+        <div class="shot a">MOSS LANTERN</div>
+        <div class="lines">
+          <p>1. <b><a href="#">Moss Lantern</a></b></p>
+          <p>💰 ₩ 16,500</p>
+          <p>📅 9/9 출시</p>
+          <p>⭐ 리뷰 214개 (긍정 93%)</p>
+          <p>🎯 추천 이유: Cozy · Exploration · Crafting</p>
+          <p>📝 이끼 낀 숲을 등불 하나로 밝히며 정원을 되살리는 느긋한 탐험 게임</p>
+        </div>
+        <div class="shot b">TIDEBOUND CAFÉ</div>
+        <div class="lines">
+          <p>2. <b><a href="#">Tidebound Café</a></b></p>
+          <p>💰 ₩ 12,000 → ₩ 9,600 (-20%)</p>
+          <p>📅 9/11 출시</p>
+          <p>🚧 얼리 액세스</p>
+          <p>⭐ 아직 리뷰 없음</p>
+          <p>🎯 추천 이유: Management · Cute</p>
+          <p>📝 밀물과 썰물에 따라 메뉴가 바뀌는 바닷가 카페 경영 시뮬레이션</p>
+        </div>
+        <div class="ctx">추천 기준: 내 취향 태그 중, 이번 주 신작에는 드물게(10% 이하) 붙는 태그가 2개 이상 겹친 게임<br>해보고 싶은 건 직접 골라서 찜하기. 최종 판단은 사람 몫</div>
+      </div>
+    </div>
+    <div>
+      <div class="grid" style="grid-template-columns: 1fr;">
+        <div class="card"><h3>🖼️ 스팀 대표 이미지</h3><p>상점 공식 이미지. 한국어판 이미지가 있으면 그걸 씁니다.</p></div>
+        <div class="card"><h3>📝 한 줄 소개</h3><p>한국어 소개가 있으면 한국어, 없으면 영어.</p></div>
+        <div class="card"><h3>🌱 새 게임이 아닌 것도 표시</h3><p>얼리 액세스 졸업작 · 재출시작은 "첫 출시 2021년"처럼 밝혀 둡니다.</p></div>
+      </div>
+      <p class="note">※ 위 게임 두 개는 설명을 위한 가상의 예시입니다.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>어떻게 고르나</h2>
+  <p class="sub">"내가 좋아하는 태그가 붙었다"만으로는 부족합니다. Indie · Casual처럼 누구에게나 붙는 태그는 아무것도 말해 주지 않으니까요.</p>
+  <div class="grid">
+    <div class="card"><div class="num">1</div><h3>내 취향 태그</h3><p>스팀 라이브러리에서 오래 한 게임(소프트웨어 제외)과 좋아하는 게임 링크의 공식 태그 중, 여러 게임에 공통으로 나오는 것.</p></div>
+    <div class="card"><div class="num">2</div><h3>이번 주에 드문 태그</h3><p>그 주 신작의 10% 이하에만 붙은 태그. 드물수록 점수가 높고, 흔한 태그는 거의 0점.</p></div>
+    <div class="card"><div class="num">3</div><h3>2개 이상 겹치면 추천</h3><p>드문 취향 태그가 2개 이상 겹친 신작만, 점수순 최대 10개. 약한 주엔 억지로 채우지 않습니다.</p></div>
+  </div>
+  <div class="example scroll">
+    <table>
+      <thead><tr><th>신작</th><th>태그 (취향과 겹친 것 · <span class="tag rare">드문 것</span>)</th><th>결과</th></tr></thead>
+      <tbody>
+        <tr><td>게임 A</td><td><span class="tag rare">Cozy</span> <span class="tag rare">Crafting</span> <span class="tag">Indie</span></td><td class="ok">추천</td></tr>
+        <tr><td>게임 B</td><td><span class="tag">Indie</span> <span class="tag">Casual</span> <span class="tag">Puzzle</span> <span class="tag">2D</span></td><td class="no">통과 못 함 — 겹쳐도 전부 흔함</td></tr>
+        <tr><td>게임 C</td><td><span class="tag rare">Horror</span> <span class="tag">Indie</span> <span class="tag">Action</span></td><td class="no">통과 못 함 — 드문 태그 1개</td></tr>
+      </tbody>
+    </table>
+    <p class="note">실제 한 주: 신작 237개 중 기준 통과 46개 → 점수 상위 10개를 보냈습니다.</p>
+  </div>
+</section>
+
+<section>
+  <h2>매일 · 매주 하는 일</h2>
+  <p class="sub">GitHub Actions가 정해진 시간에 돌리고, 결과를 저장소에 커밋합니다.</p>
+  <div class="flow"><span class="when">매일 08:00</span>
+    <span class="step">수집<small>스팀 공식 API · 키 없음</small></span><span class="arrow">→</span>
+    <span class="step">품질 점검<small>15항목</small></span><span class="arrow">→</span>
+    <span class="step">적재<small>통과한 날만</small></span>
+  </div>
+  <div class="flow"><span class="when">월요일 08:00</span>
+    <span class="step">취향 갱신<small>사람마다 스팀 라이브러리</small></span><span class="arrow">→</span>
+    <span class="step">채점<small>지난 7일 신작</small></span><span class="arrow">→</span>
+    <span class="step">슬랙 DM<small>사람마다 따로</small></span>
+  </div>
+</section>
+
+<section>
+  <h2>조용히 실패하지 않는다</h2>
+  <p class="sub">자동화에서 제일 무서운 건 "돌긴 도는데 틀린 것"입니다.</p>
+  <ul class="checks">
+    <li><b>실패하면 GitHub 이슈</b><span>수집 · 점검 · 취향 갱신 · 발송 중 하나라도 실패하면 무엇이 왜 실패했는지 이슈로 남깁니다.</span></li>
+    <li><b>한 사람의 실패는 그 사람에서 끝</b><span>누군가의 DM이 실패해도 다른 사람은 받습니다. 스팀 프로필이 비공개로 바뀌면 지난 취향으로 보내고 알립니다.</span></li>
+    <li><b>점검을 통과한 데이터만 쓴다</b><span>매일 15항목(누락 · 중복 · 가격 · 태그 · 출시일 …)을 점검하고, 오늘 것이 실패하면 적재하지 않습니다.</span></li>
+    <li><b>기록은 덮어쓰지 않는다</b><span>날짜가 붙은 원본 · 점검 결과 · 리포트는 다시 돌려도 -2, -3으로 새로 남습니다.</span></li>
+    <li><b>비밀값은 어디에도 남지 않는다</b><span>스팀 키 · 슬랙 토큰은 GitHub Secrets에만. 오류 기록엔 예외 종류와 HTTP 코드만 남기고, 이를 테스트로 확인합니다.</span></li>
+  </ul>
+</section>
+
+<section id="setup">
+  <h2>직접 써 보기</h2>
+  <p class="sub">자세한 내용은 저장소의 README에 있습니다.</p>
+  <ol class="setup">
+    <li>저장소를 가져갑니다(Fork 또는 코드 복사). 명단에 슬랙 ID가 들어가니 <b>비공개 저장소</b>를 권합니다.</li>
+    <li>Settings → Secrets에 <code>SLACK_BOT_TOKEN</code>(슬랙 앱, <code>chat:write</code>)과 <code>STEAM_API_KEY</code>를 넣습니다.</li>
+    <li>Settings → Variables에 <code>RADAR_ENABLED</code> = <code>true</code>를 넣으면 매일 수집이 켜집니다.</li>
+    <li><code>subscribers.yaml</code>에 슬랙 멤버 ID와 스팀 프로필 주소를 적습니다. 일주일 뒤 월요일에 첫 DM이 옵니다.</li>
+  </ol>
+  <div class="stack" style="margin-top:18px">
+    <span>Python 3.12</span><span>GitHub Actions</span><span>Steam Web API · Store API</span><span>Slack Block Kit</span><span>pytest · 테스트 218개</span>
+  </div>
+</section>
+
+<footer>
+  인디게임 레이더 · 게임 정보와 이미지는 Steam에서 가져오며, 각 게임의 권리는 해당 개발사 · 배급사에 있습니다.
+  · <a href="https://github.com/luxxy132-netizen/indie-radar-public">GitHub</a>
+</footer>
+
+</div>
+</body>
+</html>

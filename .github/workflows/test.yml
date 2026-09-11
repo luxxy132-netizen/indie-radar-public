@@ -1,0 +1,31 @@
+# 코드가 바뀔 때만 단위 테스트. 매일 수집(collect.yml)은 테스트에 막히지 않는다.
+# 봇이 올리는 데이터 커밋(raw/ · qa/ · data/)은 paths에 안 걸려서 여기를 깨우지 않는다.
+name: test
+
+on:
+  push:
+    paths:
+      - "**.py"
+      - "requirements.txt"
+      - "seed_library.yaml"
+      - "subscribers.yaml"
+      - ".github/workflows/*.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성
+        run: pip install -r requirements.txt
+
+      - name: 단위 테스트
+        run: python -m pytest -q test_collect.py test_qa.py test_build_profile.py test_report.py test_build_user_profiles.py

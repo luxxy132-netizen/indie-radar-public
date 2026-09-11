@@ -1,0 +1,21 @@
+# subscribers.yaml — 주간 추천을 슬랙 개인 DM으로 받는 사람들. 운영자가 직접 추가한다(2026-09-11 사람과 정함).
+#
+# 한 사람 = 한 항목
+#   id             영어 소문자 · 숫자만. 리포트 파일 이름에 쓴다(report/{시작일}_{종료일}_{id}.json)
+#   slack_user     슬랙 멤버 ID — 슬랙 프로필 → ⋮ → "멤버 ID 복사" (U로 시작)
+#   steam_profile  스팀 프로필 주소(기본 재료). 스팀 개인정보 설정에서 '게임 세부 정보'와 '총 플레이 시간'이 공개여야 한다
+#   favorites      좋아하는 게임 상점 링크(보조 재료, 선택). 스팀 프로필 없이 이것만 써도 된다(링크가 충분히 많아야 함)
+#   profile_path   운영자만 — 이미 만든 취향 파일을 그대로 쓴다(다시 만들지 않음). steam_profile을 같이 적어 두면
+#                  `python build_user_profiles.py --only ID --dry-run`으로 스팀 취향을 만들어 출력만 한다(비교용)
+#
+# 예:
+#   - id: friend1
+#     slack_user: U0123ABCD
+#     steam_profile: https://steamcommunity.com/id/이름
+#     favorites:
+#       - https://store.steampowered.com/app/892970/Valheim/
+#
+# 슬랙 멤버 ID · 스팀 주소는 개인정보다 — 저장소는 비공개로 둔다.
+
+
+subscribers: []
